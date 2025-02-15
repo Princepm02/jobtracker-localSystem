@@ -3,7 +3,8 @@ import axios from 'axios';
 
 const ApplicationList = () => {
   const [applications, setApplications] = useState([]);
-  const [newApp, setNewApp] = useState({
+  // This state holds the form data used for both adding and updating
+  const [formData, setFormData] = useState({
     companyName: '',
     role: '',
     appliedDate: '',
@@ -11,6 +12,9 @@ const ApplicationList = () => {
     interviewDate: '',
     notes: ''
   });
+  // If editingId is null, the form is used to add a new application.
+  // Otherwise, it is used to update the application with the given ID.
+  const [editingId, setEditingId] = useState(null);
 
   const fetchApplications = async () => {
     try {
@@ -26,31 +30,57 @@ const ApplicationList = () => {
   }, []);
 
   const handleInputChange = (e) => {
-    setNewApp({ ...newApp, [e.target.name]: e.target.value });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleAddApplication = async (e) => {
+  const resetForm = () => {
+    setFormData({
+      companyName: '',
+      role: '',
+      appliedDate: '',
+      status: 'Pending',
+      interviewDate: '',
+      notes: ''
+    });
+    setEditingId(null);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Prepare payload (dates can be null if not provided)
+    const payload = {
+      ...formData,
+      appliedDate: formData.appliedDate || null,
+      interviewDate: formData.interviewDate || null,
+    };
+
     try {
-      // Prepare the payload (dates can be null if empty)
-      const payload = {
-        ...newApp,
-        appliedDate: newApp.appliedDate || null,
-        interviewDate: newApp.interviewDate || null
-      };
-      await axios.post('http://localhost:8080/api/applications', payload);
-      setNewApp({
-        companyName: '',
-        role: '',
-        appliedDate: '',
-        status: 'Pending',
-        interviewDate: '',
-        notes: ''
-      });
+      if (editingId === null) {
+        // Adding a new application
+        await axios.post('http://localhost:8080/api/applications', payload);
+      } else {
+        // Updating an existing application (ID from editingId, not from payload)
+        await axios.put(`http://localhost:8080/api/applications/${editingId}`, payload);
+      }
+      resetForm();
       fetchApplications();
     } catch (error) {
-      console.error('Error adding application:', error);
+      console.error('Error submitting form:', error);
     }
+  };
+
+  const handleEdit = (application) => {
+    // Populate form with selected application data for editing
+    setFormData({
+      companyName: application.companyName,
+      role: application.role,
+      appliedDate: application.appliedDate,
+      status: application.status,
+      interviewDate: application.interviewDate || '',
+      notes: application.notes || '',
+    });
+    setEditingId(application.id);
   };
 
   const handleDelete = async (id) => {
@@ -64,15 +94,15 @@ const ApplicationList = () => {
 
   return (
     <div>
-      <h2>Add New Application</h2>
-      <form onSubmit={handleAddApplication}>
+      <h2>{editingId ? 'Update Application' : 'Add New Application'}</h2>
+      <form onSubmit={handleSubmit}>
         <div className="mb-3">
           <label>Company Name</label>
           <input 
             type="text" 
             className="form-control" 
             name="companyName" 
-            value={newApp.companyName} 
+            value={formData.companyName} 
             onChange={handleInputChange} 
             required 
           />
@@ -83,7 +113,7 @@ const ApplicationList = () => {
             type="text" 
             className="form-control" 
             name="role" 
-            value={newApp.role} 
+            value={formData.role} 
             onChange={handleInputChange} 
             required 
           />
@@ -94,7 +124,7 @@ const ApplicationList = () => {
             type="date" 
             className="form-control" 
             name="appliedDate" 
-            value={newApp.appliedDate} 
+            value={formData.appliedDate} 
             onChange={handleInputChange} 
             required 
           />
@@ -104,7 +134,7 @@ const ApplicationList = () => {
           <select 
             className="form-control" 
             name="status" 
-            value={newApp.status} 
+            value={formData.status} 
             onChange={handleInputChange}
           >
             <option value="Pending">Pending</option>
@@ -119,7 +149,7 @@ const ApplicationList = () => {
             type="date" 
             className="form-control" 
             name="interviewDate" 
-            value={newApp.interviewDate} 
+            value={formData.interviewDate} 
             onChange={handleInputChange} 
           />
         </div>
@@ -128,11 +158,18 @@ const ApplicationList = () => {
           <textarea 
             className="form-control" 
             name="notes" 
-            value={newApp.notes} 
+            value={formData.notes} 
             onChange={handleInputChange}>
           </textarea>
         </div>
-        <button type="submit" className="btn btn-primary">Add Application</button>
+        <button type="submit" className="btn btn-primary">
+          {editingId ? 'Update Application' : 'Add Application'}
+        </button>
+        {editingId && (
+          <button type="button" className="btn btn-secondary ms-2" onClick={resetForm}>
+            Cancel
+          </button>
+        )}
       </form>
 
       <hr />
@@ -160,6 +197,9 @@ const ApplicationList = () => {
               <td>{app.interviewDate}</td>
               <td>{app.notes}</td>
               <td>
+                <button className="btn btn-warning btn-sm me-2" onClick={() => handleEdit(app)}>
+                  Edit
+                </button>
                 <button className="btn btn-danger btn-sm" onClick={() => handleDelete(app.id)}>
                   Delete
                 </button>
